@@ -134,11 +134,13 @@ async def get_score(id: str):
 @app.get("/search_scores")
 async def search_scores(player_name: str = None):
     if player_name:
+        #validates the player name to avoid SQL injection attacks
         if not re.match(r'^[a-zA-Z0-9_ ]+$', player_name):
             raise HTTPException(status_code=400, detail="Invalid characters in player name")
         
         scores = await db["Score"].find({"player_name": player_name}).to_list(length=100)
     else:
+        #returns all the scores if no name is provided
         scores = await db["Score"].find().to_list(length=100)
 
     return scores

@@ -16,7 +16,7 @@ def getDB():
     MONGO_URI = os.getenv("MONGO_URI")
     client = AsyncIOMotorClient(MONGO_URI)
     db = client["Assets"]
-    yield db
+    return db
 
 #validates the player model
 class PlayerScore(BaseModel):

@@ -12,7 +12,7 @@ from bson import ObjectId
 app = FastAPI()
 
 #gets the mongo uri from the environment to access the database
-MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://jake:Gunshot391@cluster.bynp3th.mongodb.net/")
+MONGO_URI = os.getenv("MONGO_URI")
 client = AsyncIOMotorClient(MONGO_URI)
 #connects to the database called Assets
 db = client["Assets"]

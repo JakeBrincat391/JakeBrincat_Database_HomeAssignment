@@ -11,9 +11,6 @@
         "src": "/(.*)",
         "dest": "main.py"
       }
-    ],
-    "env": {
-      "MONGO_URI": "mongodb+srv://jake:Gunshot391@cluster.bynp3th.mongodb.net/"
-    }
+    ]
   }
   

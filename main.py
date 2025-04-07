@@ -144,3 +144,6 @@ async def search_scores(player_name: str = None):
         scores = await db["Score"].find().to_list(length=100)
 
     return scores
+
+from mangum import Mangum
+handler = Mangum(app)

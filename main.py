@@ -44,7 +44,7 @@ def get_mime_type(filename):
 #Helper function to Process the uploading of files
 async def process_file(file: UploadFile):
     content = await file.read()
-    if len(content) > 10 * 1024 * 1024:
+    if len(content) > 4 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="File too large")
     encoded = base64.b64encode(content).decode("utf-8")
     return {

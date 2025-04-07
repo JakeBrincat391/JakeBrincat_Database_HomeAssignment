@@ -3,7 +3,7 @@ import base64
 import mimetypes
 from datetime import datetime
 import re
-from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi import FastAPI, File, UploadFile, HTTPException, Depends
 from fastapi.responses import Response
 from pydantic import BaseModel, validator
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -12,10 +12,11 @@ from bson import ObjectId
 app = FastAPI()
 
 #gets the mongo uri from the environment to access the database
-MONGO_URI = os.getenv("MONGO_URI")
-client = AsyncIOMotorClient(MONGO_URI)
-#connects to the database called Assets
-db = client["Assets"]
+def getDB():
+    MONGO_URI = os.getenv("MONGO_URI")
+    client = AsyncIOMotorClient(MONGO_URI)
+    db = client["Assets"]
+    yield db
 
 #validates the player model
 class PlayerScore(BaseModel):
@@ -57,14 +58,14 @@ async def process_file(file: UploadFile):
 
 #uploads a sprite/image file to the database
 @app.post("/upload_sprite")
-async def upload_sprite(file: UploadFile = File(...)):
+async def upload_sprite(file: UploadFile = File(...), db=Depends()):
     data = await process_file(file)
     result = await db["Sprites"].insert_one(data)
     return {"message": "Sprite uploaded", "id": str(result.inserted_id)}
 
 #retrieves the uploaded sprite/image file by its given MongoDB ID
 @app.get("/sprite/{id}")
-async def get_sprite(id: str):
+async def get_sprite(id: str, db=Depends(getDB())):
     if not ObjectId.is_valid(id):
         raise HTTPException(status_code=400, detail="Invalid ID format")
     
@@ -80,14 +81,14 @@ async def get_sprite(id: str):
 
 #uploads an audio file to the database
 @app.post("/upload_audio")
-async def upload_audio(file: UploadFile = File(...)):
+async def upload_audio(file: UploadFile = File(...), db=Depends(getDB())):
     data = await process_file(file)
     result = await db["Audio"].insert_one(data)
     return {"message": "Audio uploaded", "id": str(result.inserted_id)}
 
 #retrieves the uploaded audio file by its given MongoDB ID
 @app.get("/audio/{id}")
-async def get_audio(id: str):
+async def get_audio(id: str, db=Depends(getDB())):
     if not ObjectId.is_valid(id):
         raise HTTPException(status_code=400, detail="Invalid ID format")
     
@@ -103,7 +104,7 @@ async def get_audio(id: str):
 
 #uploads the player score to the database as a JSON object
 @app.post("/player_score")
-async def upload_score(score: PlayerScore):
+async def upload_score(score: PlayerScore, db=Depends(getDB())):
     if score.score < 0:
         raise HTTPException(status_code=400, detail="Score must be non-negative")
     doc = {
@@ -116,7 +117,7 @@ async def upload_score(score: PlayerScore):
 
 #retrieves the player score by its given MongoDB ID
 @app.get("/player_score/{id}")
-async def get_score(id: str):
+async def get_score(id: str, db=Depends(getDB())):
     if not ObjectId.is_valid(id):
         raise HTTPException(status_code=400, detail="Invalid ID format")
     
@@ -132,7 +133,7 @@ async def get_score(id: str):
 
 #searches player scores based on the player name
 @app.get("/search_scores")
-async def search_scores(player_name: str = None):
+async def search_scores(player_name: str = None, db=Depends(getDB())):
     if player_name:
         #validates the player name to avoid SQL injection attacks
         if not re.match(r'^[a-zA-Z0-9_ ]+$', player_name):

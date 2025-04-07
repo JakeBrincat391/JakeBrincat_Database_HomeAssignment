@@ -12,7 +12,7 @@ from bson import ObjectId
 app = FastAPI()
 
 #gets the mongo uri from the environment to access the database
-MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://jake:Gunshot391@cluster.bynp3th.mongodb.net/")
+MONGO_URI = os.getenv("MONGO_URI", "mongodb://jake:Gunshot391@ac-temkrcg-shard-00-00.bynp3th.mongodb.net:27017,ac-temkrcg-shard-00-01.bynp3th.mongodb.net:27017,ac-temkrcg-shard-00-02.bynp3th.mongodb.net:27017/?replicaSet=atlas-gvbwwk-shard-0&ssl=true&authSource=admin")
 client = AsyncIOMotorClient(MONGO_URI)
 #connects to the database called Assets
 db = client["Assets"]
@@ -144,6 +144,3 @@ async def search_scores(player_name: str = None):
         scores = await db["Score"].find().to_list(length=100)
 
     return scores
-
-from mangum import Mangum
-handler = Mangum(app)

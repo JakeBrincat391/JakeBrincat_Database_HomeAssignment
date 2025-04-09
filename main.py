@@ -3,7 +3,7 @@ import base64
 import mimetypes
 from datetime import datetime
 import re
-from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi import FastAPI, File, UploadFile, HTTPException, Body
 from fastapi.responses import Response
 from pydantic import BaseModel, validator
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -14,6 +14,7 @@ app = FastAPI()
 #gets the mongo uri from the environment to access the database
 MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://jake:<db_password>@cluster.bynp3th.mongodb.net/")
 client = AsyncIOMotorClient(MONGO_URI)
+
 #connects to the database called Assets
 db = client["Assets"]
 
@@ -67,16 +68,35 @@ async def upload_sprite(file: UploadFile = File(...)):
 async def get_sprite(id: str):
     if not ObjectId.is_valid(id):
         raise HTTPException(status_code=400, detail="Invalid ID format")
-    
     sprite = await db["Sprites"].find_one({"_id": ObjectId(id)})
     if not sprite:
         raise HTTPException(status_code=404, detail="Sprite not found")
-    
     return Response(
         content=base64.b64decode(sprite["content"]),
         media_type=sprite["file_type"],
         headers={"Content-Disposition": f"inline; filename={sprite['filename']}"}
     )
+
+# Updates an existing sprite by its MongoDB ID
+@app.put("/sprite/{id}")
+async def update_sprite(id: str, file: UploadFile = File(...)):
+    if not ObjectId.is_valid(id):
+        raise HTTPException(status_code=400, detail="Invalid ID format")
+    data = await process_file(file)
+    result = await db["Sprites"].update_one({"_id": ObjectId(id)}, {"$set": data})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Sprite not found")
+    return {"message": "Sprite updated successfully"}
+
+# Deletes an existing sprite by its MongoDB ID
+@app.delete("/sprite/{id}")
+async def delete_sprite(id: str):
+    if not ObjectId.is_valid(id):
+        raise HTTPException(status_code=400, detail="Invalid ID format")
+    result = await db["Sprites"].delete_one({"_id": ObjectId(id)})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Sprite not found")
+    return {"message": "Sprite deleted successfully"}
 
 #uploads an audio file to the database
 @app.post("/upload_audio")
@@ -90,22 +110,39 @@ async def upload_audio(file: UploadFile = File(...)):
 async def get_audio(id: str):
     if not ObjectId.is_valid(id):
         raise HTTPException(status_code=400, detail="Invalid ID format")
-    
     audio = await db["Audio"].find_one({"_id": ObjectId(id)})
     if not audio:
         raise HTTPException(status_code=404, detail="Audio not found")
-    
     return Response(
         content=base64.b64decode(audio["content"]),
         media_type=audio["file_type"],
         headers={"Content-Disposition": f"inline; filename={audio['filename']}"}
     )
 
+# Updates an existing audio file by its MongoDB ID
+@app.put("/audio/{id}")
+async def update_audio(id: str, file: UploadFile = File(...)):
+    if not ObjectId.is_valid(id):
+        raise HTTPException(status_code=400, detail="Invalid ID format")
+    data = await process_file(file)
+    result = await db["Audio"].update_one({"_id": ObjectId(id)}, {"$set": data})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Audio not found")
+    return {"message": "Audio updated successfully"}
+
+# Deletes an existing audio file by its MongoDB ID
+@app.delete("/audio/{id}")
+async def delete_audio(id: str):
+    if not ObjectId.is_valid(id):
+        raise HTTPException(status_code=400, detail="Invalid ID format")
+    result = await db["Audio"].delete_one({"_id": ObjectId(id)})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Audio not found")
+    return {"message": "Audio deleted successfully"}
+
 #uploads the player score to the database as a JSON object
 @app.post("/player_score")
 async def upload_score(score: PlayerScore):
-    if score.score < 0:
-        raise HTTPException(status_code=400, detail="Score must be non-negative")
     doc = {
         "player_name": score.player_name,
         "score": score.score,
@@ -119,16 +156,39 @@ async def upload_score(score: PlayerScore):
 async def get_score(id: str):
     if not ObjectId.is_valid(id):
         raise HTTPException(status_code=400, detail="Invalid ID format")
-    
     score = await db["Score"].find_one({"_id": ObjectId(id)})
     if not score:
         raise HTTPException(status_code=404, detail="Score not found")
-    
     return {
         "player_name": score["player_name"],
         "score": score["score"],
         "date_achieved": score["date_achieved"]
     }
+
+# Updates a player score by its MongoDB ID
+@app.put("/player_score/{id}")
+async def update_score(id: str, updated_data: PlayerScore = Body(...)):
+    if not ObjectId.is_valid(id):
+        raise HTTPException(status_code=400, detail="Invalid ID format")
+    update = {
+        "player_name": updated_data.player_name,
+        "score": updated_data.score,
+        "date_achieved": datetime.utcnow()
+    }
+    result = await db["Score"].update_one({"_id": ObjectId(id)}, {"$set": update})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Score not found")
+    return {"message": "Score updated successfully"}
+
+# Deletes a player score by its MongoDB ID
+@app.delete("/player_score/{id}")
+async def delete_score(id: str):
+    if not ObjectId.is_valid(id):
+        raise HTTPException(status_code=400, detail="Invalid ID format")
+    result = await db["Score"].delete_one({"_id": ObjectId(id)})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Score not found")
+    return {"message": "Score deleted successfully"}
 
 #searches player scores based on the player name
 @app.get("/search_scores")
@@ -137,10 +197,8 @@ async def search_scores(player_name: str = None):
         #validates the player name to avoid SQL injection attacks
         if not re.match(r'^[a-zA-Z0-9_ ]+$', player_name):
             raise HTTPException(status_code=400, detail="Invalid characters in player name")
-        
         scores = await db["Score"].find({"player_name": player_name}).to_list(length=100)
     else:
         #returns all the scores if no name is provided
         scores = await db["Score"].find().to_list(length=100)
-
     return scores
